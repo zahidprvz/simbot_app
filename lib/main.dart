@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:simbot_app/screens/home_screen.dart';
 import 'screens/about_screen.dart';
 import 'screens/help_screen.dart';
-import 'screens/home_screen.dart';
 import 'screens/splash_screen.dart';
 import 'theme/theme_notifier.dart';
 import 'theme/theme.dart';
@@ -24,7 +24,8 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Simbot Control App',
-      theme: themeNotifier.isDarkMode ? AppTheme.darkTheme : AppTheme.lightTheme,
+      theme:
+          themeNotifier.isDarkMode ? AppTheme.darkTheme : AppTheme.lightTheme,
       initialRoute: '/',
       routes: {
         '/': (context) => SplashScreen(),

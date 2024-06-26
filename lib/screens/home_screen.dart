@@ -3,8 +3,20 @@ import 'package:provider/provider.dart';
 import 'package:simbot_app/base_screen.dart';
 import 'package:simbot_app/theme/theme.dart';
 import 'package:simbot_app/theme/theme_notifier.dart';
+import 'dart:convert';
+import 'dart:io';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
+  @override
+  _HomeScreenState createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  final TextEditingController _ipController = TextEditingController();
+  String _ipAddress = '';
+  Map<String, String> _gyroValues = {'X': '0.00', 'Y': '0.00', 'Z': '0.00'};
+  bool _isFetching = false;
+
   @override
   Widget build(BuildContext context) {
     final themeNotifier = Provider.of<ThemeNotifier>(context);
@@ -20,6 +32,7 @@ class HomeScreen extends StatelessWidget {
             children: [
               const SizedBox(height: 12.0),
               TextField(
+                controller: _ipController,
                 decoration: InputDecoration(
                   hintText: 'Enter IP Address',
                   hintStyle: TextStyle(
@@ -35,6 +48,12 @@ class HomeScreen extends StatelessWidget {
                 ),
                 textAlign: TextAlign.center,
                 style: TextStyle(color: isDarkMode ? Colors.white : null),
+                onSubmitted: (_) {
+                  setState(() {
+                    _ipAddress = _ipController.text;
+                    _fetchGyroValues();
+                  });
+                },
               ),
               const SizedBox(height: 24.0),
               Center(
@@ -44,7 +63,7 @@ class HomeScreen extends StatelessWidget {
                       icon: const Icon(Icons.arrow_upward),
                       iconSize: 48.0,
                       color: theme.colorScheme.secondary,
-                      onPressed: () {},
+                      onPressed: () => _sendCommand('forward'),
                     ),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -53,14 +72,14 @@ class HomeScreen extends StatelessWidget {
                           icon: const Icon(Icons.arrow_back),
                           iconSize: 48.0,
                           color: theme.colorScheme.secondary,
-                          onPressed: () {},
+                          onPressed: () => _sendCommand('left'),
                         ),
                         const SizedBox(width: 48.0),
                         IconButton(
                           icon: const Icon(Icons.arrow_forward),
                           iconSize: 48.0,
                           color: theme.colorScheme.secondary,
-                          onPressed: () {},
+                          onPressed: () => _sendCommand('right'),
                         ),
                       ],
                     ),
@@ -68,7 +87,7 @@ class HomeScreen extends StatelessWidget {
                       icon: const Icon(Icons.arrow_downward),
                       iconSize: 48.0,
                       color: theme.colorScheme.secondary,
-                      onPressed: () {},
+                      onPressed: () => _sendCommand('backward'),
                     ),
                   ],
                 ),
@@ -84,11 +103,17 @@ class HomeScreen extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
                   GyroValueBox(
-                      title: 'X', value: '0.00', isDarkMode: isDarkMode),
+                      title: 'X',
+                      value: _gyroValues['X']!,
+                      isDarkMode: isDarkMode),
                   GyroValueBox(
-                      title: 'Y', value: '0.00', isDarkMode: isDarkMode),
+                      title: 'Y',
+                      value: _gyroValues['Y']!,
+                      isDarkMode: isDarkMode),
                   GyroValueBox(
-                      title: 'Z', value: '0.00', isDarkMode: isDarkMode),
+                      title: 'Z',
+                      value: _gyroValues['Z']!,
+                      isDarkMode: isDarkMode),
                 ],
               ),
             ],
@@ -110,6 +135,67 @@ class HomeScreen extends StatelessWidget {
         }
       },
     );
+  }
+
+  void _fetchGyroValues() async {
+    setState(() {
+      _isFetching = true;
+    });
+
+    while (_isFetching) {
+      try {
+        final response = await HttpClient()
+            .getUrl(Uri.parse('http://$_ipAddress/gyro'))
+            .then((request) => request.close());
+
+        if (response.statusCode == 200) {
+          final String content = await response.transform(utf8.decoder).join();
+          final Map<String, dynamic> data = json.decode(content);
+          setState(() {
+            _gyroValues = {
+              'X': data['gyroX'].toString(),
+              'Y': data['gyroY'].toString(),
+              'Z': data['gyroZ'].toString(),
+            };
+          });
+        } else {
+          print('Error fetching gyro values: HTTP ${response.statusCode}');
+        }
+      } catch (e) {
+        print('Error fetching gyro values: $e');
+      }
+
+      await Future.delayed(const Duration(seconds: 1));
+    }
+  }
+
+  void _sendCommand(String command) async {
+    if (_ipAddress.isEmpty) {
+      print('IP address is not set');
+      return;
+    }
+
+    print('Sending command to http://$_ipAddress/$command');
+
+    try {
+      final response = await HttpClient()
+          .getUrl(Uri.parse('http://$_ipAddress/$command'))
+          .then((request) => request.close());
+
+      if (response.statusCode == 200) {
+        print('Command $command sent successfully');
+      } else {
+        print('Error sending command: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Connection error: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    _isFetching = false;
+    super.dispose();
   }
 }
 
